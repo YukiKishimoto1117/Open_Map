@@ -53,6 +53,10 @@
             color: white;
             border: none;
             border-radius: 5px;
+            margin: 5px;
+        }
+        .btn-red {
+            background-color: #FF0000;
         }
         .close-btn {
             display: inline-block;
@@ -71,6 +75,11 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 1001; /* 地図やポップアップの上に表示 */
+        }
+        .route-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
@@ -142,10 +151,14 @@
             }
 
             // 新しい目的地マーカーを作成
-            destinationMarker = L.marker(destinationLatLng, {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', iconSize: [32, 32]})})
-                .addTo(map)
-                .bindPopup("Destination")
-                .openPopup();
+            destinationMarker = L.marker(destinationLatLng, {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [32, 32]
+                })
+            }).addTo(map)
+            .bindPopup("Destination")
+            .openPopup();
         });
 
         // 「ナビ開始」ボタンクリック時の処理
@@ -162,32 +175,61 @@
 
             // ルート計算とポップアップ表示の設定
             routeControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(userLatLng),
-                    L.latLng(destinationLatLng)
-                ],
-                routeWhileDragging: true,
-                showAlternatives: true,
-                createMarker: function() {
-                    return null; // マーカーを非表示にする
-                },
-                lineOptions: {
-                    styles: [
-                        { color: '#0000FF', opacity: 0.6 } // デフォルトの色（青）
-                    ]
-                }
-            }).addTo(map);
+    waypoints: [
+        L.latLng(userLatLng),
+        L.latLng(destinationLatLng)
+    ],
+    routeWhileDragging: true,
+    showAlternatives: true, // 複数ルートを表示
+    createMarker: function() {
+        return null; // マーカーを非表示にする
+    },
+    lineOptions: {
+        styles: [
+            { color: '#0000FF', opacity: 0.6 } // デフォルトの色（青）
+        ]
+    }
+}).addTo(map);
+
+        routeControl.on('routesfound', function(e) {
+            var popupContent = '<h3>ルート詳細</h3>';
+            var routes = e.routes;
+
+            if (routes.length > 1) {
+                popupContent += '<div id="routeList">';
+                routes.forEach(function(route, index) {
+                    popupContent += '<div class="route-option">';
+                    popupContent += '<span>ルート ' + (index + 1) + ': ' + route.name + '</span>';
+                    popupContent += '<button class="btn" onclick="selectRoute(' + index + ')">選択</button>';
+                    popupContent += '</div>';
+                });
+                popupContent += '</div>';
+            } else {
+                popupContent += '<p>ルート: ' + routes[0].name + '</p>';
+            }
+
+            document.getElementById('popup-content').innerHTML = popupContent;
+            document.getElementById('popup').style.display = 'block';
+        });
+
 
             // ルートが計算されるまで待つ
             setTimeout(function() {
-                // ルート情報をポップアップに表示
                 var popupContent = '<h3>ルート詳細</h3>';
-                routeControl.getPlan().getRoutes().forEach(function(route, index) {
-                    popupContent += '<p><strong>ルート ' + (index + 1) + ':</strong></p>';
-                    popupContent += '<p><strong>距離:</strong> ' + (route.summary.totalDistance / 1000).toFixed(2) + ' km</p>';
-                    popupContent += '<p><strong>所要時間:</strong> ' + (route.summary.totalTime / 60).toFixed(2) + ' 分</p>';
-                    popupContent += '<button class="btn" onclick="selectRoute(' + index + ')">このルートを選択</button>';
-                });
+                var routes = routeControl.getPlan().getRoutes();
+
+                if (routes.length > 1) {
+                    popupContent += '<div id="routeList">';
+                    routes.forEach(function(route, index) {
+                        popupContent += '<div class="route-option">';
+                        popupContent += '<span>ルート ' + (index + 1) + ': ' + route.name + '</span>';
+                        popupContent += '<button class="btn" onclick="selectRoute(' + index + ')">選択</button>';
+                        popupContent += '</div>';
+                    });
+                    popupContent += '</div>';
+                } else {
+                    popupContent += '<p>ルート: ' + routes[0].name + '</p>';
+                }
 
                 document.getElementById('popup-content').innerHTML = popupContent;
                 document.getElementById('popup').style.display = 'block';
@@ -199,13 +241,33 @@
         function selectRoute(index) {
             selectedRouteIndex = index;
             routeControl.getPlan().getRoutes().forEach(function(route, i) {
-                route.setOptions({
-                    styles: [
-                        { color: (i === selectedRouteIndex) ? '#FF0000' : '#0000FF', opacity: 0.6 } // 選択されたルートは赤色、それ以外は青色
-                    ]
+                // 各ルートの色を設定する
+                routeControl.getPlan().setWaypoints([
+                    L.latLng(userLatLng), 
+                    L.latLng(destinationLatLng)
+                ]);
+                
+                // 選択されたルートのみを赤色に設定
+                routeControl.getRouter().route(routeControl.getWaypoints(), function(err, routes) {
+                    if (err) {
+                        alert('ルートを再計算できませんでした: ' + err);
+                        return;
+                    }
+                    // ルートの再描画と色設定
+                    routeControl.setRoutes(routes);
+                    routeControl.getPlan().getRoutes().forEach(function(r, j) {
+                        r.setStyle({
+                            color: j === selectedRouteIndex ? '#FF0000' : '#0000FF',
+                            opacity: 0.6
+                        });
+                    });
                 });
             });
-        }
+
+    // ポップアップを閉じる
+    document.getElementById('popup').style.display = 'none';
+}
+
 
         // ポップアップを閉じる処理
         document.getElementById('closePopup').addEventListener('click', function() {
