@@ -19,7 +19,7 @@
 
     <style>
         #map {
-            height: 600px;
+            height: 100%;
             width: 100%;
         }
         #popup {
@@ -61,11 +61,20 @@
             border-radius: 5px;
             float: right;
         }
+        #navButtonContainer {
+            position: fixed;
+            bottom: 20px; /* 地図から少し離れた位置に配置 */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001; /* 地図やポップアップの上に表示 */
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <button class="btn" id="startNavigation">ナビ開始</button>
+    <div id="navButtonContainer">
+        <button class="btn" id="startNavigation">ナビ開始</button>
+    </div>
     <div id="popup">
         <button class="close-btn" id="closePopup">閉じる</button>
         <div id="popup-content"></div>
