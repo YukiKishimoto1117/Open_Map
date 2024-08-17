@@ -22,10 +22,42 @@
             height: 600px;
             width: 100%;
         }
+        #popup {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #ccc;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            display: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #popup-content {
+            margin: 0;
+            padding: 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <button class="btn" id="startNavigation">ナビ開始</button>
+    <div id="popup">
+        <div id="popup-content"></div>
+    </div>
 
     <script>
         // 地図の初期化
@@ -72,16 +104,26 @@
             alert("このブラウザでは位置情報が利用できません。");
         }
 
-        // 地図をクリックした際の目的地設定とルート計算
+        var destinationLatLng = null;
+
+        // 地図をクリックした際の目的地設定
         map.on('click', function(e) {
-            var destinationLatLng = e.latlng;
+            destinationLatLng = e.latlng;
+        });
+
+        // 「ナビ開始」ボタンクリック時の処理
+        document.getElementById('startNavigation').addEventListener('click', function() {
+            if (!destinationLatLng) {
+                alert("目的地をクリックして設定してください。");
+                return;
+            }
 
             // 既にルートが設定されている場合はそれを削除
             if (routeControl) {
                 map.removeControl(routeControl);
             }
 
-            // ルート計算とナビゲーションの設定
+            // ルート計算とポップアップ表示の設定
             routeControl = L.Routing.control({
                 waypoints: [
                     L.latLng(userLatLng),
@@ -93,6 +135,16 @@
                     return L.marker(waypoint.latLng).bindPopup(i === 0 ? "出発地" : "目的地").openPopup();
                 }
             }).addTo(map);
+
+            // ポップアップにルート情報を表示
+            var popupContent = '<h3>ルート詳細</h3>';
+            routeControl.getPlan().getRoutes().forEach(function(route) {
+                popupContent += '<p><strong>距離:</strong> ' + route.summary.totalDistance + ' メートル</p>';
+                popupContent += '<p><strong>所要時間:</strong> ' + (route.summary.totalTime / 60).toFixed(2) + ' 分</p>';
+            });
+
+            document.getElementById('popup-content').innerHTML = popupContent;
+            document.getElementById('popup').style.display = 'block';
         });
     </script>
 </body>
