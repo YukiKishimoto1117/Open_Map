@@ -98,6 +98,7 @@
         var userLatLng = null;
         var routeControl = null;
         var destinationLatLng = null;
+        var destinationMarker = null; // 目的地マーカーを追加
         var selectedRouteIndex = null; // 選択されたルートのインデックス
 
         // Geolocation APIで現在地を監視
@@ -131,9 +132,20 @@
             alert("このブラウザでは位置情報が利用できません。");
         }
 
-        // 地図をクリックした際の目的地設定
+        // 地図をクリックした際の目的地設定とピンの追加
         map.on('click', function(e) {
             destinationLatLng = e.latlng;
+
+            // 既存の目的地マーカーがあれば削除
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+            }
+
+            // 新しい目的地マーカーを作成
+            destinationMarker = L.marker(destinationLatLng, {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', iconSize: [32, 32]})})
+                .addTo(map)
+                .bindPopup("Destination")
+                .openPopup();
         });
 
         // 「ナビ開始」ボタンクリック時の処理
