@@ -50,12 +50,24 @@
             border: none;
             border-radius: 5px;
         }
+        .close-btn {
+            display: inline-block;
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            float: right;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <button class="btn" id="startNavigation">ナビ開始</button>
     <div id="popup">
+        <button class="close-btn" id="closePopup">閉じる</button>
         <div id="popup-content"></div>
     </div>
 
@@ -72,6 +84,7 @@
         var userMarker = null;
         var userLatLng = null;
         var routeControl = null;
+        var destinationLatLng = null;
 
         // Geolocation APIで現在地を監視
         if (navigator.geolocation) {
@@ -104,8 +117,6 @@
             alert("このブラウザでは位置情報が利用できません。");
         }
 
-        var destinationLatLng = null;
-
         // 地図をクリックした際の目的地設定
         map.on('click', function(e) {
             destinationLatLng = e.latlng;
@@ -137,14 +148,21 @@
             }).addTo(map);
 
             // ポップアップにルート情報を表示
-            var popupContent = '<h3>ルート詳細</h3>';
-            routeControl.getPlan().getRoutes().forEach(function(route) {
-                popupContent += '<p><strong>距離:</strong> ' + route.summary.totalDistance + ' メートル</p>';
-                popupContent += '<p><strong>所要時間:</strong> ' + (route.summary.totalTime / 60).toFixed(2) + ' 分</p>';
-            });
+            setTimeout(function() {
+                var popupContent = '<h3>ルート詳細</h3>';
+                routeControl.getPlan().getRoutes().forEach(function(route) {
+                    popupContent += '<p><strong>距離:</strong> ' + (route.summary.totalDistance / 1000).toFixed(2) + ' km</p>';
+                    popupContent += '<p><strong>所要時間:</strong> ' + (route.summary.totalTime / 60).toFixed(2) + ' 分</p>';
+                });
 
-            document.getElementById('popup-content').innerHTML = popupContent;
-            document.getElementById('popup').style.display = 'block';
+                document.getElementById('popup-content').innerHTML = popupContent;
+                document.getElementById('popup').style.display = 'block';
+            }, 1000); // ルート計算が完了するまで少し待つ
+        });
+
+        // ポップアップを閉じる処理
+        document.getElementById('closePopup').addEventListener('click', function() {
+            document.getElementById('popup').style.display = 'none';
         });
     </script>
 </body>
