@@ -85,6 +85,7 @@
         var userLatLng = null;
         var routeControl = null;
         var destinationLatLng = null;
+        var selectedRouteIndex = null; // 選択されたルートのインデックス
 
         // Geolocation APIで現在地を監視
         if (navigator.geolocation) {
@@ -142,23 +143,44 @@
                 ],
                 routeWhileDragging: true,
                 showAlternatives: true,
-                createMarker: function(i, waypoint, n) {
-                    return L.marker(waypoint.latLng).bindPopup(i === 0 ? "出発地" : "目的地").openPopup();
+                createMarker: function() {
+                    return null; // マーカーを非表示にする
+                },
+                lineOptions: {
+                    styles: [
+                        { color: '#0000FF', opacity: 0.6 } // デフォルトの色（青）
+                    ]
                 }
             }).addTo(map);
 
-            // ポップアップにルート情報を表示
+            // ルートが計算されるまで待つ
             setTimeout(function() {
+                // ルート情報をポップアップに表示
                 var popupContent = '<h3>ルート詳細</h3>';
-                routeControl.getPlan().getRoutes().forEach(function(route) {
+                routeControl.getPlan().getRoutes().forEach(function(route, index) {
+                    popupContent += '<p><strong>ルート ' + (index + 1) + ':</strong></p>';
                     popupContent += '<p><strong>距離:</strong> ' + (route.summary.totalDistance / 1000).toFixed(2) + ' km</p>';
                     popupContent += '<p><strong>所要時間:</strong> ' + (route.summary.totalTime / 60).toFixed(2) + ' 分</p>';
+                    popupContent += '<button class="btn" onclick="selectRoute(' + index + ')">このルートを選択</button>';
                 });
 
                 document.getElementById('popup-content').innerHTML = popupContent;
                 document.getElementById('popup').style.display = 'block';
+
             }, 1000); // ルート計算が完了するまで少し待つ
         });
+
+        // ルート選択の処理
+        function selectRoute(index) {
+            selectedRouteIndex = index;
+            routeControl.getPlan().getRoutes().forEach(function(route, i) {
+                route.setOptions({
+                    styles: [
+                        { color: (i === selectedRouteIndex) ? '#FF0000' : '#0000FF', opacity: 0.6 } // 選択されたルートは赤色、それ以外は青色
+                    ]
+                });
+            });
+        }
 
         // ポップアップを閉じる処理
         document.getElementById('closePopup').addEventListener('click', function() {
