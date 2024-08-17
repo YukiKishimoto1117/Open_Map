@@ -10,6 +10,12 @@
     
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <!-- Leaflet Routing Machine JS -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <style>
         #map {
@@ -32,11 +38,13 @@
 
         // 現在地を表示するためのマーカーを初期化
         var userMarker = null;
+        var userLatLng = null;
+        var routeControl = null;
 
         // Geolocation APIで現在地を監視
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(function(position) {
-                var userLatLng = [position.coords.latitude, position.coords.longitude];
+                userLatLng = [position.coords.latitude, position.coords.longitude];
 
                 // マーカーがまだない場合は作成し、既にある場合は位置を更新
                 if (!userMarker) {
@@ -47,6 +55,11 @@
 
                 // 地図の中心を現在地に設定
                 map.setView(userLatLng, 15);
+
+                // ルートが既に設定されている場合は再計算
+                if (routeControl) {
+                    routeControl.setWaypoints([L.latLng(userLatLng), routeControl.getWaypoints()[1].latLng]);
+                }
 
             }, function() {
                 alert("位置情報が取得できませんでした。");
@@ -59,34 +72,28 @@
             alert("このブラウザでは位置情報が利用できません。");
         }
 
-        // navigator.geolocation.getCurrentPosition(function(position) {
-        //     var userLatLng = [position.coords.latitude, position.coords.longitude];
-        //     map.setView(userLatLng, 15);
-        //     L.marker(userLatLng).addTo(map);
-        // }, function() {
-        //     alert("位置情報が取得できませんでした。");
-        // }, {
-        //     enableHighAccuracy: true,
-        //     maximumAge: 0, // キャッシュされた位置情報を使用しない
-        //     timeout: 10000 // 10秒以内に位置情報を取得できない場合はエラー
-        // });
-        navigator.geolocation.watchPosition(function(position) {
-            var userLatLng = [position.coords.latitude, position.coords.longitude];
+        // 地図をクリックした際の目的地設定とルート計算
+        map.on('click', function(e) {
+            var destinationLatLng = e.latlng;
 
-            // 新しいマーカーを現在地に追加
-            L.marker(userLatLng).addTo(map).bindPopup("現在地").openPopup();
+            // 既にルートが設定されている場合はそれを削除
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
 
-            // 地図の中心を現在地に設定
-            map.setView(userLatLng, 15);
-
-        }, function() {
-            alert("位置情報が取得できませんでした。");
-        }, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000
+            // ルート計算とナビゲーションの設定
+            routeControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLatLng),
+                    L.latLng(destinationLatLng)
+                ],
+                routeWhileDragging: true,
+                showAlternatives: true,
+                createMarker: function(i, waypoint, n) {
+                    return L.marker(waypoint.latLng).bindPopup(i === 0 ? "出発地" : "目的地").openPopup();
+                }
+            }).addTo(map);
         });
-
     </script>
 </body>
 </html>
