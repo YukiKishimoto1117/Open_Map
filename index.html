@@ -14,112 +14,184 @@
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
+    <link rel="stylesheet" href="app.css" />
+
     <!-- Leaflet Routing Machine JS -->
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-        }
-        #popup {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-top: 1px solid #ccc;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-            padding: 10px;
-            display: none;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-        }
-        #popup-content {
-            margin: 0;
-            padding: 0;
-        }
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            margin: 5px;
-        }
-        .btn-red {
-            background-color: #FF0000;
-        }
-        .close-btn {
-            display: inline-block;
-            padding: 5px 10px;
-            font-size: 14px;
-            cursor: pointer;
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            float: right;
-        }
-        #navButtonContainer {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1001;
-        }
-        .route-option {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-    </style>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map" style="height: 600px;"></div>
     <div id="navButtonContainer">
         <button class="btn" id="startNavigation">ルート表示</button>
     </div>
+    <button class="btn" onclick="addWaypoint()">経由地を追加</button>
+    <div>
+        <label for="waypointSelect">経由地を選択</label>
+        <select id="waypointSelect">
+            <!-- ピンのオプションをここに追加 -->
+        </select>
+    </div>    
     <div id="popup">
         <button class="close-btn" id="closePopup">閉じる</button>
         <div id="popup-content"></div>
     </div>
 
     <script>
-        // 初期化
         var map = L.map('map').setView([35.681236, 139.767125], 13);
         var userMarker = null;
         var userLatLng = null;
         var routeControl = null;
-        var destinationLatLng = null;
+        var waypoints = [];
+        var waypointMarkers = [];
+        var pinMarkers = [];
+        var pinCount = 0;
         var destinationMarker = null;
+        var routeLine = null;
 
-        // タイルレイヤーの追加
+        // カスタムアイコンを定義
+        var userIcon = L.divIcon({
+            className: 'custom-icon',
+            html: '<div style="width: 24px; height: 24px; border-radius: 50%; background: #0000ff; border: 4px solid #ffffff;"></div>',
+            iconSize: [34, 34], // borderの分も含めたサイズ
+            iconAnchor: [17, 17] // 中心を正確に合わせるためにサイズを変更
+        });
+
+        function updateRoute() {
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            var routeWaypoints = [L.latLng(userLatLng)];
+            waypointMarkers.forEach(function(marker) {
+                routeWaypoints.push(marker.getLatLng());
+            });
+
+            routeControl = L.Routing.control({
+                waypoints: routeWaypoints,
+                routeWhileDragging: true,
+                createMarker: function() { return null; }, // マーカーを作成しない
+                lineOptions: {
+                    styles: [{ color: '#0000FF', opacity: 0.6 }]
+                }
+            }).addTo(map);
+        }
+
+        function addWaypoint() {
+            var waypointSelect = document.getElementById('waypointSelect');
+            if (waypointSelect && waypointSelect.value) {
+                var selectedPin = waypoints[waypointSelect.value];
+                if (selectedPin) {
+                    var marker = L.marker([selectedPin.lat, selectedPin.lng], {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                            iconSize: [32, 32]
+                        })
+                    }).addTo(map);
+                    waypointMarkers.push(marker);
+                    updateRoute(); // ルートを更新する
+                } else {
+                    console.error("選択されたピンが存在しません");
+                }
+            } else {
+                console.error("Waypoint select box or its value is not found.");
+            }
+        }
+
+        function updateWaypointSelect() {
+            var waypointSelect = document.getElementById('waypointSelect');
+            waypointSelect.innerHTML = '';
+
+            waypoints.forEach(function(waypoint, index) {
+                var option = document.createElement('option');
+                option.value = index;
+                option.text = waypoint.name;
+                waypointSelect.appendChild(option);
+            });
+        }
+
+        function updateSelectionOptions() {
+            var optionsHtml = '';
+            pinMarkers.forEach(function(pin, index) {
+                optionsHtml += '<option value="' + index + '">' + pin.name + '</option>';
+            });
+
+            var selectionHtml = '<label>目的地: <select id="destinationSelect">' + optionsHtml + '</select></label><br>';
+            selectionHtml += '<label>経由地: <select id="waypointsSelect" multiple>' + optionsHtml + '</select></label>';
+
+            document.getElementById('popup-content').innerHTML = selectionHtml;
+        }
+
+        document.getElementById('startNavigation').addEventListener('click', function() {
+            var destinationIndex = document.getElementById('destinationSelect').value;
+            var waypointIndexes = Array.from(document.getElementById('waypointsSelect').selectedOptions).map(option => option.value);
+
+            var routeWaypoints = [L.latLng(userLatLng)];
+            waypointIndexes.forEach(function(index) {
+                routeWaypoints.push(pinMarkers[index].latlng);
+            });
+            routeWaypoints.push(pinMarkers[destinationIndex].latlng);
+
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: routeWaypoints,
+                routeWhileDragging: true,
+                createMarker: function() {
+                    return null;
+                },
+                lineOptions: {
+                    styles: [{ color: '#0000FF', opacity: 0.6 }]
+                }
+            }).addTo(map);
+        });
+
+        document.getElementById('closePopup').addEventListener('click', function() {
+            document.getElementById('popup').style.display = 'none';
+        });
+
+        map.on('click', function(e) {
+            var destinationLatLng = e.latlng;
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+            }
+            destinationMarker = L.marker(destinationLatLng, {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [32, 32]
+                })
+            }).addTo(map).bindPopup("Destination").openPopup();
+
+            waypoints.push({lat: destinationLatLng.lat, lng: destinationLatLng.lng, name: 'ピン' + (waypoints.length + 1)});
+            updateWaypointSelect();
+
+            var pinName = 'ピン' + (++pinCount);
+            var pinMarker = L.marker(e.latlng, {
+                icon: L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                    iconSize: [32, 32]
+                })
+            }).addTo(map).bindPopup(pinName).openPopup();
+
+            pinMarkers.push({ name: pinName, latlng: e.latlng });
+            updateSelectionOptions();
+        });
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // 現在地を監視
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(function(position) {
                 userLatLng = [position.coords.latitude, position.coords.longitude];
                 if (!userMarker) {
-                    userMarker = L.marker(userLatLng).addTo(map).bindPopup("You are here");
+                    userMarker = L.marker(userLatLng, {icon: userIcon}).addTo(map).bindPopup("You are here");
                 } else {
                     userMarker.setLatLng(userLatLng);
                 }
                 map.setView(userLatLng, 15);
-                if (routeControl) {
-                    routeControl.setWaypoints([L.latLng(userLatLng), routeControl.getWaypoints()[1].latLng]);
-                }
+                updateRoute(); // 現在地を使ってルートを更新
             }, function() {
                 alert("位置情報が取得できませんでした。");
             }, {
@@ -131,107 +203,7 @@
             alert("このブラウザでは位置情報が利用できません。");
         }
 
-        // 地図クリックで目的地設定
-        map.on('click', function(e) {
-            destinationLatLng = e.latlng;
-            if (destinationMarker) {
-                map.removeLayer(destinationMarker);
-            }
-            destinationMarker = L.marker(destinationLatLng, {
-                icon: L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-                    iconSize: [32, 32]
-                })
-            }).addTo(map).bindPopup("Destination").openPopup();
-        });
-
-        var routesCache = []; // ルート情報をキャッシュするための変数
-
-        // 「ナビ開始」ボタンクリック時の処理
-        document.getElementById('startNavigation').addEventListener('click', function() {
-            if (!destinationLatLng) {
-                alert("目的地をクリックして設定してください。");
-                return;
-            }
-
-            // 既にルートが設定されている場合はそれを削除
-            if (routeControl) {
-                map.removeControl(routeControl);
-            }
-
-            // ルート計算とポップアップ表示の設定
-            routeControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(userLatLng),
-                    L.latLng(destinationLatLng)
-                ],
-                routeWhileDragging: true,
-                showAlternatives: true, // 複数ルートを表示
-                createMarker: function() {
-                    return null; // マーカーを非表示にする
-                },
-                lineOptions: {
-                    styles: [
-                        { color: '#0000FF', opacity: 0.6 } // デフォルトの色（青）
-                    ]
-                }
-            }).addTo(map);
-
-            // ルートが計算された時の処理
-            routeControl.on('routesfound', function(e) {
-                routesCache = e.routes; // ルート情報をキャッシュする
-                var popupContent = '<h3>ルート詳細</h3>';
-                var routes = e.routes;
-
-                if (routes.length > 1) {
-                    popupContent += '<div id="routeList">';
-                    routes.forEach(function(route, index) {
-                        popupContent += '<div class="route-option">';
-                        popupContent += '<span>ルート ' + (index + 1) + ': ' + route.name + '</span>';
-                        popupContent += '<button class="btn" onclick="selectRoute(' + index + ')">選択</button>';
-                        popupContent += '</div>';
-                    });
-                    popupContent += '</div>';
-                } else {
-                    popupContent += '<p>ルート: ' + routes[0].name + '</p>';
-                }
-
-                document.getElementById('popup-content').innerHTML = popupContent;
-                document.getElementById('popup').style.display = 'block';
-            });
-
-            // ポップアップを閉じる処理
-            document.getElementById('closePopup').addEventListener('click', function() {
-                document.getElementById('popup').style.display = 'none';
-            });
-        });
-
-        // ルート選択
-        function selectRoute(index) {
-            if (!routesCache || index >= routesCache.length || index < 0) {
-                console.error("ルートが見つかりません");
-                return;
-            }
-
-            // ルートのポリラインを再描画
-            routesCache.forEach((route, i) => {
-                if (route && route.routes && route.routes[0]) {
-                    if (i === index) {
-                        route.routes[0].options.styles = [{ color: '#FF0000', opacity: 0.6 }]; // 選択されたルートを赤に
-                        route.routes[0].addTo(map); // 選択されたルートを再表示
-                    } else {
-                        route.routes[0].remove(); // 選択されていないルートを削除
-                    }
-                }
-            });
-
-            // ポップアップの内容を選択されたルートのみに更新
-            var selectedRoute = routesCache[index];
-            var popupContent = '<h3>選択したルート詳細</h3>';
-            popupContent += '<p>ルート: ' + selectedRoute.name + '</p>';
-            document.getElementById('popup-content').innerHTML = popupContent;
-            document.getElementById('popup').style.display = 'block';
-        }
+        console.log('Map object:', map);
     </script>
 </body>
 </html>
